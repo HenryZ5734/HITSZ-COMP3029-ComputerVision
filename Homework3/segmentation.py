@@ -36,27 +36,40 @@ def kmeans(features, k, num_iters=500):
     centers = features[idxs]
     assignments = np.zeros(N, dtype=np.uint32)
 
-    for n in range(num_iters):
+    for _ in range(num_iters):
         ### YOUR CODE HERE
-        pass
+        for i in range(N):
+            assignments[i] = np.argmin(np.linalg.norm(features[i] - centers, axis=1))
+        new_centers = np.array([features[assignments == i].mean(axis=0) for i in range(k)])
+        if np.allclose(centers, new_centers):
+            break
+        centers = new_centers
         ### END YOUR CODE
 
     return assignments
 
 ### Clustering Methods for colorful image
-def kmeans_color(features, k, num_iters=500):
-    N=None # 像素个数
+def kmeans_color(features, k, num_iters=100):
+    H, W, D = features.shape
+    N = H * W
+
+    # Randomly initalize cluster centers
+    features = features.reshape((N, D))
+    idxs = np.random.choice(N, size=k, replace=False)
+    centers = features[idxs]
     assignments = np.zeros(N, dtype=np.uint32)
     #Like the kmeans function above
     ### YOUR CODE HERE
-    pass
+    for _ in range(num_iters):
+        for i in range(N):
+            assignments[i] = np.argmin(np.linalg.norm(features[i] - centers, axis=1))
+        new_centers = np.array([features[assignments == i].mean(axis=0) for i in range(k)])
+        if np.allclose(centers, new_centers):
+            break
+        centers = new_centers
     ### END YOUR CODE
 
-    return assignments
-
-
-
-
+    return assignments.reshape(H, W)
 
 #找每个点最后会收敛到的地方（peak）
 def findpeak(data, idx, r):
@@ -69,14 +82,18 @@ def findpeak(data, idx, r):
 
     # Runs until the shift is smaller than the set threshold
     while (shift > t).any() :
-        # 计算当前点和所有点之间的距离
-        # 并筛选出在半径r内的点，计算mean vector（这里是最简单的均值，也可尝试高斯加权）
-        # 用新的center（peak）更新当前点，直到满足要求跳出循环
         ### YOUR CODE HERE
-        pass
+        # 计算当前点和所有点之间的距离
+        dis = np.linalg.norm(dataT - data_pointT, axis=1)
+        # 并筛选出在半径r内的点，计算mean vector（这里是最简单的均值，也可尝试高斯加权）
+        data_intra = dataT[dis < r]
+        data_point_new = np.mean(data_intra, axis=0)
+        # 用新的center（peak）更新当前点，直到满足要求跳出循环
+        shift = data_point_new - data_point
+        data_point = data_point_new
         ### END YOUR CODE
 
-    return data_pointT.T
+    return data_point
 
 
 # Mean shift algorithm
@@ -89,18 +106,25 @@ def meanshift(data, r):
 
     # findpeak is called for the first index out of the loop
     peak = findpeak(data, 0, r)
-    peakT = np.concatenate(peak, axis=0).T
-    peaks.append(peakT)
+    peaks.append(peak)
 
     # Every data point is iterated through
-    for idx in range(0, len(data.T)):
+    ### YOUR CODE HERE
+    for idx in range(1, len(data.T)):
         # 遍历数据，寻找当前点的peak
+        peak = findpeak(data, idx, r)
         # 并实时关注当前peak是否会收敛到一个新的聚类（和已有peaks比较）
-        # 若是，更新label_no，peaks，labels，继续
-        # 若不是，当前点就属于已有类，继续
-        ### YOUR CODE HERE
-        pass
-        ### END YOUR CODE
+        dis = np.linalg.norm(np.array(peaks) - peak, axis=1)
+        dis_min = np.min(dis)
+        if dis_min >= r:
+            # 若是，更新label_no，peaks，labels，继续
+            label_no += 1
+            labels[idx] = label_no
+            peaks.append(peak)
+        else:
+            # 若不是，当前点就属于已有类，继续
+            labels[idx] = np.argmin(dis) + 1
+    ### END YOUR CODE
     #print(set(labels))
     return labels, np.array(peaks).T
 
@@ -155,7 +179,9 @@ def compute_accuracy(mask_gt, mask):
 
     accuracy = None
     ### YOUR CODE HERE
-    pass
+    accuracy1 = np.sum(np.abs(mask_gt - mask)) / mask_gt.size
+    accuracy2 = np.sum(np.abs(mask_gt - (1 - mask))) / mask_gt.size
+    accuracy = max(accuracy1, accuracy2)
     ### END YOUR CODE
 
     return accuracy
